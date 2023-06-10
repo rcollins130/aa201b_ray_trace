@@ -1,5 +1,5 @@
 %%
-% FINAL PROJECT: AIRCRAFT NOISE RAY TRACING
+% FINAL PROJECT: AIRCRAFT NOISE RAY TRACING SNELL IMPLEMENTATION
 % AA201B STANFORD SPRING 2023
 % ROBERT COLLINS
 
@@ -43,7 +43,7 @@ x_max = 5000; %m
 t_max = 1000; %s
 
 % source location relative to receiver
-source_loc = [0, 5000]; %[x,z], m
+source_loc = [0, 7500]; %[x,z], m
 
 % 
 
@@ -109,9 +109,9 @@ ylabel('Altitude, m')
 %% RAY TRACE
 % to start, maybe just iterate thru z vals first?
 % initial ray vector directions
-n_rays = 50;
+n_rays = 100;
 max_trace = 1e3;
-theta = linspace(-15/16*pi, 15/16*pi, n_rays);
+theta = linspace(0, pi, n_rays);
 
 % initialze ray locations & vectors
 % [pidx, (t, x, z, dx, dz, ii_z, theta), ray]
