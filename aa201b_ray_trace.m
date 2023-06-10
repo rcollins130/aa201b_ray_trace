@@ -4,7 +4,7 @@
 % ROBERT COLLINS
 
 %% SETUP
-% clear; close all;
+clear; close all;
 
 %% PHYSICAL PARAMETERS
 
@@ -34,9 +34,7 @@ v_s = 0.05;
 
 %% SIMULATION PARAMETERS
 % x, z, t steps
-dx = 100; %m
 dz = 100; %m
-dt = 0.1; %s
 
 % x, z max values
 % note x is symmetric about 0
@@ -49,16 +47,12 @@ source_loc = [-500, 5000]; %[x,z], m
 
 % 
 
-
 %% DEFINE ENVIRONMENT
-% x and z spaces
-z = 0:dz:z_max;
-% TODO: do I need an X space?
-x = -x_max:dx:x_max; % TODO: might cause issues with odd dx/x_max vals
+% define z space 
+z = (0:dz:z_max)';
 
-t = 0:dt:t_max;
-
-[X,Z] = meshgrid(x,z);
+% map source location to z index
+[~, src_ii_z] = min(abs(source_loc(2)-z));
 
 % temperature profile
 T = T_0 - L_b * z;
@@ -80,15 +74,7 @@ P = P_b .* ((T_b - (z-z_b).*L_b)).^a;
 
 % speed of sound profile
 C = sqrt(gamma*R * T);
-
-% source location
-[~,src_row] = min(abs(z-source_loc(2)));
-[~,src_col] = min(abs(x-source_loc(1)));
-
-% receiver location
-rcv_row = 0;
-rcv_col = x_max/dx + 1;
-
+%C = ones(size(z)) * 350;
 % source level
 
 % define sim parameters
@@ -123,26 +109,61 @@ ylabel('Altitude, m')
 % to start, maybe just iterate thru z vals first?
 % initial ray vector directions
 n_rays = 5;
+max_trace = 100;
 theta = linspace(5*pi/4, 7*pi/4, n_rays);
 
 % initialze ray locations & vectors
-ray_r = zeros(length(t),2,n_rays);
-ray_dr = zeros(size(ray_r));
+% [pidx, (t,x,z,dx,dz,ii_z), ray]
+ray_data = zeros(size(z,1),6,n_rays);
 
 % initial values
-ray_r(1,:,:) = repmat(source_loc,1,1,n_rays);
-ray_dr(1,:,:) = reshape([-dz ./ tan(theta); repmat(-dz, 1, length(theta))],[1,2,length(theta)]);
+ray_data(1,:,:) = [
+    repmat([0, source_loc],1,1,n_rays) ...
+    reshape(-dz ./ tan(theta'), [1,1,n_rays]) ...
+    repmat(-dz, 1,1, n_rays) ...
+    repmat(src_ii_z, 1, 1, n_rays)
+    ];
 
-% iterate thru time
-for ii_t = 2:length(t)
-    % propagate using last dr
-    ray_r(ii_t,:,:) = ray_r(ii_t-1,:,:) + ray_dr(ii_t-1,:,:);
+% iterate thru each ray
+for ii_ray = 1:n_rays
+    % trace ray
+    for ii_pt = 2:max_trace
+        % extract last ray
+        last_ray = ray_data(ii_pt-1, :, ii_ray);
 
-    % update dr based on current wavefront position
-    ray_dr(ii_t,:,:) = ray_dr(ii_t-1,:,:)-sqrt(ii_t)/1000;
+        % calculate new position  
+        this_x = last_ray(2) + last_ray(4);
+        this_ii_z = last_ray(6) + sign(last_ray(5)); 
+        this_z = z(this_ii_z);
+
+        % calculate new t
+        dt = vecnorm([this_x, this_z] - last_ray(2:3)) / C(this_ii_z);
+        this_t = last_ray(1) + dt;
+        
+        % apply snell's law
+        this_theta = asin(last_ray(4) ./ norm(last_ray(4:5)));
+        next_theta = asin(C(this_ii_z)/C(this_ii_z+1) * sin(this_theta));
+
+        % update dr based on current wavefront position
+        this_dz = last_ray(5);
+        this_dx = -this_dz * tan(next_theta);
+
+        % update next data 
+        ray_data(ii_pt, :, ii_ray) = [
+            this_t, this_x, this_z, this_dx, this_dz, this_ii_z
+            ];
+        if this_ii_z <= 1
+            break
+        end
+
+        tracehelp = ray_data(1:ii_pt,:,ii_ray);
+    end
 end
 
 figure(2); clf; hold on
 for ii_ray = 1:n_rays
-    plot(ray_r(:,1,ii_ray), ray_r(:,2,ii_ray))
+    plot(ray_data(:,2,ii_ray), ray_data(:,3,ii_ray))
 end
+
+ylim([0,z_max])
+xlim([-5000, 5000])
