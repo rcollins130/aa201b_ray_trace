@@ -8,13 +8,13 @@ clear;
 % close all;
 
 %% SIMULATION PARAMETERS
-dz = 0.1; % m
-dt = 0.1; %s
+dz = 0.01; % m
+dt = 0.01; %s
 
 z_range = [0, 10000]; %m
 x_range = [-1000, 1000]; %m
 y_range = [-1000, 1000];
-t_max = 60; %s
+t_max = 300; %s
 
 %% PHYSICAL PARAMETERS
 % Physical Constants
@@ -50,15 +50,15 @@ T = T_0 - L_b * z;
 
 % velocity profile
 % TODO: ADD POWER LAW ABOVE ~1000M?
-vx= v_s/kar .* log(z/z_0)* 10;
+vx= v_s/kar .* log(z/z_0);
 vx(z<z_0) = 0;
 
 v = [vx, zeros(size(vx)), zeros(size(vx))]; % x, y, z
 
 % sound speed profile
 %c = sqrt(gamma * R * T);
-%c = -sawtooth(2*pi*z/max(z), 1/2)*10 + 350;
-c = 343*ones(size(z));
+c = -sawtooth(2*pi*z/max(z), 1/2)*10 + 350;
+% c = 343*ones(size(z));
 
 % compute derivatives of profiles
 v_dz = [zeros(1,3); diff(v,1,1)/dz];
@@ -85,13 +85,13 @@ ylabel('Altitude, m')
 %% RAY TRACE
 
 % 
-n_rays_theta = 15;
-n_rays_phi = 15;
+n_rays_theta = 8;
+n_rays_phi = 1;
 
 min_theta = 17/32*pi;
 max_theta = 3/4*pi;
 min_phi = 0;
-max_phi = 2*pi;
+max_phi = 0;
 
 % ray angle rel2 positive x
 la_theta = linspace(min_theta, max_theta, n_rays_theta);
@@ -158,69 +158,54 @@ for ii_theta = 1:n_rays_theta
     % compute slowness z derivative
     sz_dt = - omega ./ c .* c_dz - v_dz(:,1:2) * s_perp'; 
     
+    % setup RK4 function
+    f = @(ii_z, s_z) [
+        c(ii_z).^2 ./ omega(ii_z) * s_perp(1) + v(ii_z,1); 
+        c(ii_z).^2 ./ omega(ii_z) * s_perp(2) + v(ii_z,2); 
+        c(ii_z).^2 ./ omega(ii_z) * s_z;
+        -omega(ii_z)./c(ii_z) * c_dz(ii_z) - s_perp * v_dz(ii_z,1:2)';
+    ];
+
     max_ii_t = size(t,1);
 
     % iterate thru time
     for ii_t = 1:size(t,1)-1
         % get current ii_z 
-        [~, ii_z] = min(abs(z-r(ii_t, 3, ii_theta, ii_phi)));
+        [~, ii_z1] = min(abs(z-r(ii_t, 3, ii_theta, ii_phi)));
         
-        if ii_z == 1 || ii_z == size(z, 1)
+        if ii_z1 == 1 || ii_z1 == size(z, 1)
             max_ii_t = ii_t;
             break
         end
 
-        % EULER METHOD
-        % current values
-        % sz_dt = - omega(ii_z)./c(ii_z) * c_dz(ii_z) - s(1:2) * v_dz(ii_z,1:2)';
-        
         % advance values (euler method)
         r(ii_t+1, :, ii_theta, ii_phi) = r(ii_t,:, ii_theta, ii_phi) + ...
-            (c(ii_z).^2 / omega(ii_z) .* [s_perp, s_z] + v(ii_z,:)) .* dt;
-        s_z = s_z + sz_dt(ii_z) * dt;
+            (c(ii_z1).^2 / omega(ii_z1) .* [s_perp, s_z] + v(ii_z1,:)) .* dt;
+        s_z = s_z + sz_dt(ii_z1) * dt;
 
         % advance values (RK4)
-        
-        % compute next s_z
-        % z_1 = z(ii_z);
-        % a_1 = g(ii_z);
-        % 
-        % z_2 = z_1 + dt* a_1/2;
-        % [~, ii_z2] = min(abs(z-z_2));
-        % a_2 = g(ii_z2);
-        % 
-        % z_3 = z_1 + dt* a_2/2;
-        % [~, ii_z3] = min(abs(z-z_3));
-        % a_3 = g(ii_z3);   
-        % 
-        % z_4 = z_1 + dt* a_3;
-        % [~, ii_z4] = min(abs(z-z_4));
-        % a_4 = g(ii_z4);
-        % 
-        % s_next = s;
-        % s_next(3) = s(3) + dt/6 * (a_1 + 2*a_2 + 2*a_3 + a_4);
-        % s_h = 1/2*(s+s_next);
-        % 
-        % % compute next r
-        % b_1 = c(ii_z).^2 / omega(ii_z) * s + v(ii_z,:);
-        % 
-        % z_2 = z_1 + dt* b_1(3)/2;
-        % [~, ii_z2] = min(abs(z-z_2));
-        % b_2 = c(ii_z2).^2 / omega(ii_z2) * s_h + v(ii_z2,:);
-        % 
-        % z_2 = z_1 + dt* b_2(3)/2;
-        % [~, ii_z3] = min(abs(z-z_2));
-        % b_3 = c(ii_z3).^2 / omega(ii_z3) * s_h + v(ii_z3,:);
-        % 
-        % z_4 = z_1 + dt* b_3(3);
-        % [~, ii_z4] = min(abs(z-z_4));
-        % b_4 = c(ii_z4).^2 / omega(ii_z4) * s_next + v(ii_z4,:);
-        % 
-        % r_next = r(ii_t,:) + dt/6 * (b_1 + 2*b_2 + 2*b_3 + b_4);
+        z1 = z(ii_z1);
+        a1 = f(ii_z1, s_z);
 
-        % % advance values
-        % s = s_next;
-        % r(ii_t+1, :) = r_next;
+        z2 = z1 + dt/2 * a1(3);
+        %[~, ii_z2] = min(abs(z-z2));
+        ii_z2 = abs(ii_z1 + round((z2-z1)/dz));
+        a2 = f(ii_z2, s_z + dt/2 * a1(4));
+
+        z3 = z1 + dt/2 * a2(3);
+        % [~, ii_z3] = min(abs(z-z3));
+        ii_z3 = abs(ii_z1 + round((z3-z1)/dz));
+        a3 = f(ii_z3, s_z + dt/2 * a2(4));
+
+        z4 = z1 + dt * a3(3);
+        % [~, ii_z4] = min(abs(z-z4));
+        ii_z4 = abs(ii_z1 + round((z4-z1)/dz));
+        a4 = f(ii_z4, s_z + dt * a3(4));
+
+        dx = dt/6 * (a1 + 2*a2 + 2*a3 + a4);
+
+        r(ii_t+1, :, ii_theta, ii_phi) = r(ii_t, :, ii_theta, ii_phi) + dx(1:3)';
+        s_z = s_z + dx(4);
 
         % update plot
         % plot_array{ii_theta, ii_phi}.XData(ii_t) = r(ii_t, 1, ii_theta, ii_phi);
@@ -229,7 +214,7 @@ for ii_theta = 1:n_rays_theta
         % pause(0.0001)
     end
     
-    plot3( ...
+    plot3(ax, ...
         r(1:max_ii_t, 1, ii_theta, ii_phi),...
         r(1:max_ii_t, 2, ii_theta, ii_phi),...
         r(1:max_ii_t, 3, ii_theta, ii_phi),...
