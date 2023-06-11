@@ -9,7 +9,7 @@ clear;
 
 %% SIMULATION PARAMETERS
 dz = 0.1; % m
-dt = 0.01; %s
+dt = 0.1; %s
 
 z_range = [0, 10000]; %m
 x_range = [-1000, 1000]; %m
@@ -103,15 +103,30 @@ xlabel('x')
 ylabel('y')
 zlabel('z')
 
+r = zeros(size(t,1), 3, n_rays_theta, n_rays_phi);
+r(1,:,:,:) = repmat(r_0, 1, 1, n_rays_theta, n_rays_phi);
+
+plot_array = cell(n_rays_theta, n_rays_phi);
+
+cmap = parula(n_rays_theta);
+
+for ii_phi = 1:n_rays_phi
+for ii_theta = 1:n_rays_theta
+    plot_array{ii_theta, ii_phi} = plot3( ...
+        r(:,1,ii_theta,ii_phi), ...
+        r(:,2,ii_theta,ii_phi), ...
+        r(:,3,ii_theta,ii_phi), ...
+        'Color', cmap(ii_theta, :) ...
+    );
+end
+end
+
 for ii_phi = 1:n_rays_phi
 for ii_theta = 1:n_rays_theta
 
     % initialize ray vector
-    r = zeros(size(t, 1), 3);
+    % r = zeros(size(t, 1), 3);
     % n = zeros(size(t, 1), 3);
-
-    % initial ray position 
-    r(1,:) = r_0; % x, y, z
 
     % initial ray normal 
     n = [
@@ -122,35 +137,36 @@ for ii_theta = 1:n_rays_theta
 
     % compute starting ii_z
     [~, ii_z] = min(abs(z-r(1, 3)));
-    % 
-    % % compute slowness vector
-    s = n ./ (c(ii_z) + n * v(ii_z,:)');
-    % 
-    % % compute slowness perp and omega vec
-    % s_perp = s(1:2);
-    % omega = 1 - v(:,1:2) * s_perp';
-    % 
-    % % compute d/dt s_z = g
-    % g = - omega ./ c .* c_dz - v_dz(:,1:2) * s_perp'; 
 
+    % compute initial slowness vector
+    s = n ./ (c(ii_z) + n * v(ii_z,:)');
+    
+    % compute slowness perp and omega vec
+    s_perp = s(1:2);
+    s_z = s(3);
+    omega = 1 - v(:,1:2) * s(1:2)';
+    
+    % compute slowness z derivative
+    sz_dt = - omega ./ c .* c_dz - v_dz(:,1:2) * s_perp'; 
+
+    % iterate thru time
     for ii_t = 1:size(t,1)-1
-        % get ii_z 
-        [~, ii_z] = min(abs(z-r(ii_t, 3)));
+        % get current ii_z 
+        [~, ii_z] = min(abs(z-r(ii_t, 3, ii_theta, ii_phi)));
         
         if ii_z == 1 || ii_z == size(z, 1)
-            r = r(1:ii_t, :);
+            % r = r(1:ii_t, :);
             break
         end
 
+        % EULER METHOD
         % current values
-        % s = n ./ (c(ii_z) + n * v(ii_z,:)');
-        omega = 1 - v(ii_z, 1:2) * s(1:2)';
-        sz_dt = - omega./c(ii_z) * c_dz(ii_z) - s(1:2) * v_dz(ii_z,1:2)';
+        % sz_dt = - omega(ii_z)./c(ii_z) * c_dz(ii_z) - s(1:2) * v_dz(ii_z,1:2)';
         
         % advance values (euler method)
-        r(ii_t+1, :) = r(ii_t,:) + (c(ii_z).^2 / omega .* s + v(ii_z,:)) .* dt;
-        s(3) = s(3) + sz_dt * dt;
-        %n = s/norm(s);
+        r(ii_t+1, :, ii_theta, ii_phi) = r(ii_t,:, ii_theta, ii_phi) + ...
+            (c(ii_z).^2 / omega(ii_z) .* [s_perp, s_z] + v(ii_z,:)) .* dt;
+        s_z = s_z + sz_dt(ii_z) * dt;
 
         % advance values (RK4)
         
@@ -194,10 +210,13 @@ for ii_theta = 1:n_rays_theta
         % % advance values
         % s = s_next;
         % r(ii_t+1, :) = r_next;
-    end
 
-    plot3(ax, r(:,1), r(:,2), r(:,3))
-    pause(0.01)
+        % update plot
+        plot_array{ii_theta, ii_phi}.XData(ii_t) = r(ii_t, 1, ii_theta, ii_phi);
+        plot_array{ii_theta, ii_phi}.YData(ii_t) = r(ii_t, 2, ii_theta, ii_phi);
+        plot_array{ii_theta, ii_phi}.ZData(ii_t) = r(ii_t, 3, ii_theta, ii_phi);
+        %pause(0.0001)
+    end
 
 end
 end
