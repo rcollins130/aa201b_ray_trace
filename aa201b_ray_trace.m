@@ -6,7 +6,7 @@
 %% SETUP
 clear; 
 % close all;
-
+warning('this code does not work!')
 %% SIMULATION PARAMETERS
 dz = 10; % m
 dt = 0.01; %s
