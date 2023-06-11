@@ -77,8 +77,8 @@ c = sqrt(gamma * R * T);
 % c = 343*ones(size(z));
 
 % compute derivatives of profiles
-v_dz = [zeros(1,3); diff(v,1,1)/dz];
-c_dz = [0; diff(c)/dz];
+v_dz = [diff(v,1,1)/dz; zeros(1,3)];
+c_dz = [diff(c)/dz; 0];
 
 %% INITIAL PLOTTING
 % Plot environmental profile
@@ -118,7 +118,7 @@ max_ii_t = repmat(size(t,1), n_rays,1);
 %r(1,:,:,:) = repmat(r_0, 1, 1, n_rays_theta, n_rays_phi);
 
 tic 
-parfor ii_ray = 1:n_rays    
+for ii_ray = 1:n_rays    
     this_r = zeros(size(t, 1), 3);
     this_r(1,:) = r_0;
     % initialize ray vector
@@ -148,17 +148,17 @@ parfor ii_ray = 1:n_rays
     sz_dt = - omega ./ c .* c_dz - v_dz(:,1:2) * s_perp'; 
     
     % setup RK4 function
-    f = @(ii_z, s_z) [
+    f = @(sgn, ii_z, s_z) [
         c(ii_z).^2 ./ omega(ii_z) * s_perp(1) + v(ii_z,1); 
         c(ii_z).^2 ./ omega(ii_z) * s_perp(2) + v(ii_z,2); 
         c(ii_z).^2 ./ omega(ii_z) * s_z;
-        -omega(ii_z)./c(ii_z) * c_dz(ii_z) - s_perp * v_dz(ii_z,1:2)';
+        sgn*(-omega(ii_z)./c(ii_z) * c_dz(ii_z) - s_perp * v_dz(ii_z,1:2)');
     ];
     
     ii_z1 = ii_z0;
     % iterate thru time
     for ii_t = 1:size(t,1)-1
-        if ii_z1 <= 1 || ii_z1 >= size(z, 1)
+        if ii_z1 >= size(z, 1)
             max_ii_t(ii_ray) = ii_t;
             break
         end
@@ -166,19 +166,19 @@ parfor ii_ray = 1:n_rays
         if use_rk4
             % advance values (RK4)
             z1 = this_r(ii_t, 3);
-            a1 = f(ii_z1, s_z);
+            a1 = f(sign(z1), ii_z1, s_z);
     
             z2 = z1 + dt/2 * a1(3);
-            ii_z2 = round2zlim(ii_z1 + round((z2-z1)/dz));
-            a2 = f(ii_z2, s_z + dt/2 * a1(4));
+            ii_z2 = round2zlim(ii_z1 + round((abs(z2)-z1)/dz));
+            a2 = f(sign(z2), ii_z2, s_z + dt/2 * a1(4));
     
             z3 = z1 + dt/2 * a2(3);
-            ii_z3 = round2zlim(ii_z1 + round((z3-z1)/dz));
-            a3 = f(ii_z3, s_z + dt/2 * a2(4));
+            ii_z3 = round2zlim(ii_z1 + round((abs(z3)-z1)/dz));
+            a3 = f(sign(z3), ii_z3, s_z + dt/2 * a2(4));
     
             z4 = z1 + dt * a3(3);
-            ii_z4 = round2zlim(ii_z1 + round((z4-z1)/dz));
-            a4 = f(ii_z4, s_z + dt * a3(4));
+            ii_z4 = round2zlim(ii_z1 + round((abs(z4)-z1)/dz));
+            a4 = f(sign(z4), ii_z4, s_z + dt * a3(4));
     
             dx = dt/6 * (a1 + 2*a2 + 2*a3 + a4);
     
@@ -186,12 +186,13 @@ parfor ii_ray = 1:n_rays
             s_z = s_z + dx(4);
         else
             % advance values (euler method)
+            warning('reflections not implemented');
             this_r(ii_t+1, :) = this_r(ii_t,:) + ...
                 (c(ii_z1).^2 / omega(ii_z1) .* [s_perp, s_z] + v(ii_z1,:)) .* dt;
             s_z = s_z + sz_dt(ii_z1) * dt;
         end
         
-        ii_z1 = round2zlim(ii_z0 + round((this_r(ii_t+1, 3)-r_0(3))/dz));
+        ii_z1 = round2zlim(ii_z0 + round((abs(this_r(ii_t+1, 3))-r_0(3))/dz));
     end
     r(:,:,ii_ray) = this_r;
 end
@@ -217,7 +218,7 @@ for ii_ray = 1:n_rays
     plot3(ax, ...
             r(1:max_ii_t(ii_ray), 1, ii_ray),...
             r(1:max_ii_t(ii_ray), 2, ii_ray),...
-            r(1:max_ii_t(ii_ray), 3, ii_ray),...
+            abs(r(1:max_ii_t(ii_ray), 3, ii_ray)),...
             'Color', cmap(la(ii_ray,3),:)...
             );
         pause(0.01)
