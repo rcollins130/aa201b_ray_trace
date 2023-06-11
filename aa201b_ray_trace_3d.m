@@ -8,27 +8,30 @@ clear;
 % close all;
 
 %% SIMULATION PARAMETERS
-dz = 0.01; % m
-dt = 0.01; %s
+dz = 1; % m
+dt = 0.1; %s
 
-z_range = [0, 10000]; %m
-x_range = [-1000, 1000]; %m
-y_range = [-1000, 1000];
-t_max = 300; %s
+z_range = [0, 3500]; %m
+x_range = [-5000, 5000]; %m
+y_range = [-5000, 5000];
+t_max = 10; %s
 
 % 
-n_rays_theta = 8;
-n_rays_phi = 5;
+n_rays_ele = 21;
+n_rays_azi = 1;
 
-min_theta = 17/32*pi;
-max_theta = 3/4*pi;
-min_phi = 0;
-max_phi = pi;
+min_ele_deg = -85;
+max_ele_deg = 85;
+
+min_ele = deg2rad(min_ele_deg);
+max_ele = deg2rad(max_ele_deg);
+min_azi = 0;
+max_azi = 0;
 
 use_rk4 = 1;
 
 % source location
-r_0 = [0,0,5000];
+r_0 = [0,0,200];
 
 %% PHYSICAL PARAMETERS
 % Physical Constants
@@ -51,9 +54,9 @@ kar = 0.40;
 % https://en.wikipedia.org/wiki/Roughness_length
 z_0 = 0.1; 
 
-% Friction velocity
-% made this up for now
-v_s = 0.05;
+% Friction velocity, m/s
+%   Schafer and Vorlander
+v_s = 0.6;
 
 %% DEFINE ENVIRONMENT
 z = linspace(z_range(1), z_range(2), (diff(z_range))/dz + 1)';
@@ -72,9 +75,9 @@ vx(z<z_0) = 0;
 v = [vx, zeros(size(vx)), zeros(size(vx))]; % x, y, z
 
 % sound speed profile
-c = sqrt(gamma * R * T);
+% c = sqrt(gamma * R * T);
 %c = -sawtooth(2*pi*z/max(z), 1/2)*10 + 350;
-% c = 343*ones(size(z));
+c = 343*ones(size(z));
 
 % compute derivatives of profiles
 v_dz = [diff(v,1,1)/dz; zeros(1,3)];
@@ -100,15 +103,15 @@ ylabel('Altitude, m')
 
 %% RAY TRACE
 % ray angle rel2 positive x
-la_theta = linspace(min_theta, max_theta, n_rays_theta);
-la_phi = linspace(min_phi, max_phi, n_rays_phi);
+la_ele = linspace(min_ele, max_ele, n_rays_ele);
+la_azi = linspace(min_azi, max_azi, n_rays_azi);
 
-n_rays = n_rays_theta * n_rays_phi;
-la = zeros(n_rays_theta*n_rays_phi, 4);
+n_rays = n_rays_ele * n_rays_azi;
+la = zeros(n_rays_ele*n_rays_azi, 4);
 ii_ray = 1;
-for ii_theta = 1:n_rays_theta
-    for ii_phi = 1:n_rays_phi
-        la(ii_ray,:) = [la_theta(ii_theta), la_phi(ii_phi), ii_theta, ii_phi];
+for ii_theta = 1:n_rays_ele
+    for ii_phi = 1:n_rays_azi
+        la(ii_ray,:) = [la_ele(ii_theta), la_azi(ii_phi), ii_theta, ii_phi];
         ii_ray = ii_ray +1;
     end
 end
@@ -126,11 +129,17 @@ for ii_ray = 1:n_rays
     % n = zeros(size(t, 1), 3);
     
     % initial ray normal 
+    % n = [
+    %     sin(la(ii_ray, 1)) * cos(la(ii_ray, 2)) ...
+    %     sin(la(ii_ray, 1)) * sin(la(ii_ray, 2)) ...
+    %     cos(la(ii_ray, 1))
+    % ]; % x, y ,z
+    
     n = [
-        sin(la(ii_ray, 1)) * cos(la(ii_ray, 2)) ...
-        sin(la(ii_ray, 1)) * sin(la(ii_ray, 2)) ...
-        cos(la(ii_ray, 1))
-    ]; % x, y ,z
+        cos(la(ii_ray, 1)) * cos(la(ii_ray, 2)) ...
+        -cos(la(ii_ray, 1)) * sin(la(ii_ray, 2)) ...
+        sin(la(ii_ray, 1))
+    ];
 
     % compute starting ii_z
     % TODO: possibly move outside
@@ -158,7 +167,11 @@ for ii_ray = 1:n_rays
     ii_z1 = ii_z0;
     % iterate thru time
     for ii_t = 1:size(t,1)-1
-        if ii_z1 >= size(z, 1)
+        if ii_z1 >= size(z, 1) || ...
+            this_r(ii_t,1) > x_range(2) || ...
+            this_r(ii_t,1) < x_range(1) || ...
+            this_r(ii_t,2) > y_range(2) || ...
+            this_r(ii_t,2) < y_range(1)
             max_ii_t(ii_ray) = ii_t;
             break
         end
@@ -198,7 +211,7 @@ for ii_ray = 1:n_rays
 end
 toc
 
-cmap = parula(n_rays_theta);
+cmap = parula(n_rays_ele);
 figure(2); clf; hold on
 ax = gca();
 axis equal
@@ -208,10 +221,10 @@ ylabel('y')
 zlabel('z')
 colormap(cmap)
 cb = colorbar();
-dtheta = (max_theta - min_theta)/(n_rays_theta-1);
-clim([min_theta-dtheta/2, max_theta+dtheta/2])
-cb.Ticks = la_theta;
-cb.TickLabels = compose("%0.2f \\pi", la_theta/pi);
+dele = (max_ele - min_ele)/(n_rays_ele-1);
+clim([min_ele, max_ele])
+% cb.Ticks = la_ele;
+cb.TickLabels = compose("%0.2fº", rad2deg(cb.Ticks));
 ylabel(cb, 'Ray Launch Elevation')
 
 for ii_ray = 1:n_rays
@@ -223,3 +236,4 @@ for ii_ray = 1:n_rays
             );
         pause(0.01)
 end
+view([0,-1,0])
