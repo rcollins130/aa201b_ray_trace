@@ -14,7 +14,7 @@ dt = 0.1; %s
 z_range = [0, 10000]; %m
 x_range = [-1000, 1000]; %m
 y_range = [-1000, 1000];
-t_max = 500; %s
+t_max = 60; %s
 
 %% PHYSICAL PARAMETERS
 % Physical Constants
@@ -56,9 +56,9 @@ vx(z<z_0) = 0;
 v = [vx, zeros(size(vx)), zeros(size(vx))]; % x, y, z
 
 % sound speed profile
-% c = sqrt(gamma * R * T);
-c = -sawtooth(2*pi*z/max(z), 1/2)*10 + 350;
-%c = 343*ones(size(z));
+%c = sqrt(gamma * R * T);
+%c = -sawtooth(2*pi*z/max(z), 1/2)*10 + 350;
+c = 343*ones(size(z));
 
 % compute derivatives of profiles
 v_dz = [zeros(1,3); diff(v,1,1)/dz];
@@ -85,16 +85,22 @@ ylabel('Altitude, m')
 %% RAY TRACE
 
 % 
-n_rays_theta = 4;
-n_rays_phi = 4;
+n_rays_theta = 15;
+n_rays_phi = 15;
+
+min_theta = 17/32*pi;
+max_theta = 3/4*pi;
+min_phi = 0;
+max_phi = 2*pi;
 
 % ray angle rel2 positive x
-la_theta = linspace(17/32*pi, 3/4*pi, n_rays_theta);
-la_phi = linspace(0, 2*pi, n_rays_phi+1);
+la_theta = linspace(min_theta, max_theta, n_rays_theta);
+la_phi = linspace(min_phi, max_phi, n_rays_phi+1);
 la_phi = la_phi(1:end-1);
 
 r_0 = [0,0,5000];
 
+cmap = parula(n_rays_theta);
 figure(2); clf; hold on
 ax = gca();
 axis equal
@@ -102,24 +108,27 @@ view([1 1 1])
 xlabel('x')
 ylabel('y')
 zlabel('z')
-
+colormap(cmap)
+cb = colorbar();
+dtheta = (max_theta - min_theta)/(n_rays_theta-1);
+clim([min_theta-dtheta/2, max_theta+dtheta/2])
+cb.Ticks = la_theta;
+cb.TickLabels = compose("%0.2f \\pi", la_theta/pi);
+ylabel(cb, 'Ray Launch Elevation')
 r = zeros(size(t,1), 3, n_rays_theta, n_rays_phi);
 r(1,:,:,:) = repmat(r_0, 1, 1, n_rays_theta, n_rays_phi);
 
-plot_array = cell(n_rays_theta, n_rays_phi);
-
-cmap = parula(n_rays_theta);
-
-for ii_phi = 1:n_rays_phi
-for ii_theta = 1:n_rays_theta
-    plot_array{ii_theta, ii_phi} = plot3( ...
-        r(:,1,ii_theta,ii_phi), ...
-        r(:,2,ii_theta,ii_phi), ...
-        r(:,3,ii_theta,ii_phi), ...
-        'Color', cmap(ii_theta, :) ...
-    );
-end
-end
+% plot_array = cell(n_rays_theta, n_rays_phi);
+% for ii_phi = 1:n_rays_phi
+% for ii_theta = 1:n_rays_theta
+%     plot_array{ii_theta, ii_phi} = plot3( ...
+%         r(:,1,ii_theta,ii_phi), ...
+%         r(:,2,ii_theta,ii_phi), ...
+%         r(:,3,ii_theta,ii_phi), ...
+%         'Color', cmap(ii_theta, :) ...
+%     );
+% end
+% end
 
 for ii_phi = 1:n_rays_phi
 for ii_theta = 1:n_rays_theta
@@ -148,6 +157,8 @@ for ii_theta = 1:n_rays_theta
     
     % compute slowness z derivative
     sz_dt = - omega ./ c .* c_dz - v_dz(:,1:2) * s_perp'; 
+    
+    max_ii_t = size(t,1);
 
     % iterate thru time
     for ii_t = 1:size(t,1)-1
@@ -155,7 +166,7 @@ for ii_theta = 1:n_rays_theta
         [~, ii_z] = min(abs(z-r(ii_t, 3, ii_theta, ii_phi)));
         
         if ii_z == 1 || ii_z == size(z, 1)
-            % r = r(1:ii_t, :);
+            max_ii_t = ii_t;
             break
         end
 
@@ -212,12 +223,19 @@ for ii_theta = 1:n_rays_theta
         % r(ii_t+1, :) = r_next;
 
         % update plot
-        plot_array{ii_theta, ii_phi}.XData(ii_t) = r(ii_t, 1, ii_theta, ii_phi);
-        plot_array{ii_theta, ii_phi}.YData(ii_t) = r(ii_t, 2, ii_theta, ii_phi);
-        plot_array{ii_theta, ii_phi}.ZData(ii_t) = r(ii_t, 3, ii_theta, ii_phi);
-        %pause(0.0001)
+        % plot_array{ii_theta, ii_phi}.XData(ii_t) = r(ii_t, 1, ii_theta, ii_phi);
+        % plot_array{ii_theta, ii_phi}.YData(ii_t) = r(ii_t, 2, ii_theta, ii_phi);
+        % plot_array{ii_theta, ii_phi}.ZData(ii_t) = r(ii_t, 3, ii_theta, ii_phi);
+        % pause(0.0001)
     end
-
+    
+    plot3( ...
+        r(1:max_ii_t, 1, ii_theta, ii_phi),...
+        r(1:max_ii_t, 2, ii_theta, ii_phi),...
+        r(1:max_ii_t, 3, ii_theta, ii_phi),...
+        'Color', cmap(ii_theta,:)...
+        );
+    pause(0.01)
 end
 end
 
