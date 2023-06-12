@@ -19,7 +19,7 @@ z_range = [0, 3500]; %m
 
 % rays
 n_rays_ele = 25;
-n_rays_azi = 4;
+n_rays_azi = 16;
 min_ele = deg2rad(-90);
 max_ele = deg2rad(90);
 min_azi = deg2rad(-180);
@@ -31,33 +31,16 @@ r_0 = [0,0,500];
 % wind azimuth
 wind_azi = deg2rad(0);
 
-%% PHYSICAL PARAMETERS
-T_0 = 288.15; % Reference sea level temperature, K
-L_b = 0.0065; % Temperature lapse rate, K/m
-gamma= 1.4; % adiabatic index
-R = 287.058; % molar gas constant, dry air, m2/s2
-kar = 0.40; % Karman Constant
-z_0 = 0.1; % Surface roughness, m 
-v_s = 0.6; % Friction velocity, m/s
-
 %% DEFINE ENVIRONMENT
 % height profile
 z = linspace(z_range(1), z_range(2), (diff(z_range))/dz + 1)';
 
-% temperature profile
-T = T_0 - L_b * z;
+% default environment profiles
+[T,c,v] = generate_profiles(z, wind_azi);
 
-% velocity profile
-% TODO: ADD POWER LAW ABOVE ~1000M?
-v_mag= v_s/kar .* log(z/z_0);
-v = -v_mag * [cos(wind_azi), sin(wind_azi)]; % x, y
-v(z<z_0, :) = 0;
-
-% sound speed profile
-c = sqrt(gamma * R * T);
+% alternate profiles
 % c = -sawtooth(2*pi*z/max(z), 1/2)*10 + 350;
 % c = 343*ones(size(z));
-
 
 %% RAY TRACE
 [la, ele_idx, ~] = launch_angles(...

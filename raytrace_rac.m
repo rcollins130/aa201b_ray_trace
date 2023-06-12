@@ -12,8 +12,11 @@ function [this_r, ii_t] = raytrace_rac(dt, nt, dz, r_0, la_ele, la_azi, z, v, c)
 %   r: [x,y,z;] Ray Position
 
 % compute gradients
-v_dz = [diff(v,1,1)/dz; zeros(1,2)];
-c_dz = [diff(c,1,1)/dz; 0];
+% v_dz = [diff(v,1,1)/dz; zeros(1,2)];
+% c_dz = [diff(c,1,1)/dz; 0];
+% change had no effect
+[~, v_dz] = gradient(v, dz);
+c_dz = gradient(c, dz);
 
 % Initialize ray position vector
 this_r = zeros(nt, 3);
@@ -27,7 +30,8 @@ n = [
 ];
 
 % compute starting ii_z
-ii_z0 = round((abs(r_0(3) - z(1))) / dz); 
+get_zidx = @(zt)(floor((abs(zt - z(1))) / dz)+1);
+ii_z0 = get_zidx(r_0(3)); 
 
 % [~, ii_z0] = min(abs(z-this_r(1, 3)));
 
@@ -50,48 +54,36 @@ f = @(sgn, ii_z, s_z) [
 ii_z1 = ii_z0;
 % iterate thru time
 for ii_t = 1:size(this_r,1)-1
-    if ii_z1 >= size(z, 1) || ii_t == size(this_r,1) %|| ...
-        % this_r(ii_t,1) > x_range(2) || ...
-        % this_r(ii_t,1) < x_range(1) || ...
-        % this_r(ii_t,2) > y_range(2) || ...
-        % this_r(ii_t,2) < y_range(1)
+    if ii_z1 >= size(z, 1) || ii_t == size(this_r,1)
         break
     end
     
-    % if use_rk4
-        % advance values (RK4)
-        z1 = this_r(ii_t, 3);
-        a1 = f(sign(z1), ii_z1, s_z);
+    % advance values (RK4)
+    z1 = this_r(ii_t, 3);
+    a1 = f(sign(z1), ii_z1, s_z);
 
-        z2 = z1 + dt/2 * a1(3);
-        ii_z2 = abs(ii_z1 + ceil((abs(z2)-z1)/dz));
-        if ii_z2 > size(z,1); break; end
-        a2 = f(sign(z2), ii_z2, s_z + dt/2 * a1(4));
+    z2 = z1 + dt/2 * a1(3);
+    ii_z2 = get_zidx(z2);
+    if ii_z2 > size(z,1); ii_z2 = size(z,1); end
+    a2 = f(sign(z2), ii_z2, s_z + dt/2 * a1(4));
 
-        z3 = z1 + dt/2 * a2(3);
-        ii_z3 = abs(ii_z1 + ceil((abs(z3)-z1)/dz));
-        if ii_z3 > size(z,1); break; end
+    z3 = z1 + dt/2 * a2(3);
+    ii_z3 = get_zidx(z3);
+    if ii_z3 > size(z,1); ii_z3 = size(z,1); end
 
-        a3 = f(sign(z3), ii_z3, s_z + dt/2 * a2(4));
+    a3 = f(sign(z3), ii_z3, s_z + dt/2 * a2(4));
 
-        z4 = z1 + dt * a3(3);
-        ii_z4 = abs(ii_z1 + ceil((abs(z4)-z1)/dz));
-        if ii_z4 > size(z,1); break; end
-        a4 = f(sign(z4), ii_z4, s_z + dt * a3(4));
+    z4 = z1 + dt * a3(3);
+    ii_z4 = get_zidx(z4);
+    if ii_z4 > size(z,1); ii_z4 = size(z,1); end
+    a4 = f(sign(z4), ii_z4, s_z + dt * a3(4));
 
-        dx = dt/6 * (a1 + 2*a2 + 2*a3 + a4);
+    dx = dt/6 * (a1 + 2*a2 + 2*a3 + a4);
 
-        this_r(ii_t+1, :) = this_r(ii_t, :) + dx(1:3)';
-        s_z = s_z + dx(4);
-    % else
-    %     % advance values (euler method)
-    %     warning('reflections not implemented');
-    %     this_r(ii_t+1, :) = this_r(ii_t,:) + ...
-    %         (c(ii_z1).^2 / omega(ii_z1) .* [s_perp, s_z] + v(ii_z1,:)) .* dt;
-    %     s_z = s_z + sz_dt(ii_z1) * dt;
-    % end
-    
-    ii_z1 = ii_z0 + ceil((abs(this_r(ii_t+1, 3))-r_0(3))/dz);
+    this_r(ii_t+1, :) = this_r(ii_t, :) + dx(1:3)';
+    s_z = s_z + dx(4);
+
+    ii_z1 = get_zidx(this_r(ii_t+1,3));
 end
 
 end
