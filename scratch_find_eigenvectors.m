@@ -11,12 +11,12 @@ clear;
 dt = 0.1; %s
 t_max = 5; %s
 dz = 0.1; %m
-z_range = [0, 2400];
+z_range = [0, 1000];
 
 % source and receiver
-x_src = [0, -500, 600];
-x_rcv = [0, 0, 30];
-rad_rcv = 20;
+x_src = [0     0   300];
+x_rcv = [50,100,1];
+rad_rcv = 15;
 
 % wind
 wind_azi = deg2rad(0);
@@ -26,6 +26,7 @@ nt = t_max / dt + 1;
 z = linspace(z_range(1), z_range(2), (diff(z_range))/dz + 1)';
 
 [T,c,v] = generate_profiles(z, wind_azi);
+v = v*0;
 
 % initial ray sweep
 n_rays_ele = 7;
@@ -60,7 +61,7 @@ for ii_theta = 1:n_rays_ele
 end
 
 % sweep rays
-r = zeros(nt, 3, size(la, 1));
+r = nan(nt, 3, size(la, 1));
 max_ii_t = repmat(nt, size(la,1),1);
 
 for ii_ray = 1:size(la,1)
@@ -98,7 +99,8 @@ plot3(x_src(1), x_src(2), x_src(3),'ro');
 plot3(x_rcv(1), x_rcv(2), x_rcv(3),'bo');
 
 % find ray that got closest to the point
-d_mins = min(vecnorm(x_rcv - r, 2,2),[],1);
+track_dists = vecnorm(x_rcv - r, 2,2);
+d_mins = min(track_dists,[],1);
 [best_d, best_ray] = min(d_mins)
 
 plot3(ax, ...

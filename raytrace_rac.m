@@ -19,7 +19,7 @@ function [this_r, ii_t] = raytrace_rac(dt, nt, dz, r_0, la_ele, la_azi, z, v, c)
 c_dz = gradient(c, dz);
 
 % Initialize ray position vector
-this_r = zeros(nt, 3);
+this_r = nan(nt, 3);
 this_r(1,:) = r_0;
 
 % Initialize Ray Normal
