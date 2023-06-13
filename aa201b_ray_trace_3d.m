@@ -19,14 +19,14 @@ z_range = [0, 3500]; %m
 
 % rays
 n_rays_ele = 25;
-n_rays_azi = 16;
-min_ele = deg2rad(-90);
-max_ele = deg2rad(90);
-min_azi = deg2rad(-180);
-max_azi = deg2rad(90);
+n_rays_azi = 25;
+min_ele = deg2rad(-45);
+max_ele = deg2rad(10);
+min_azi = deg2rad(0);
+max_azi = deg2rad(360-17/360);
 
 % source location
-r_0 = [0,0,500];
+r_0 = [0,0,750];
 
 % wind azimuth
 wind_azi = deg2rad(0);
@@ -61,45 +61,49 @@ toc
 %% PLOTTING
 % Plot environmental profile
 figure(1); clf;
-subplot(1,4,1)
+subplot(1,3,1)
 plot(T,z)
 xlabel('Temperature, K')
 ylabel('Altitude, m')
 
-subplot(1,4,3)
+subplot(1,3,2)
 plot(c,z)
 xlabel('Sound Speed, m/s')
 ylabel('Altitude, m')
 
-subplot(1,4,4)
+subplot(1,3,3)
 plot(vecnorm(v,2,2),z)
 xlabel('Wind Velocity, m/s')
 ylabel('Altitude, m')
 
-% Plot Rays
+%% Plot Rays
 cmap = parula(n_rays_ele);
 figure(2); clf; hold on
-ax = gca();
+%subplot(2,1,2)
+ax = gca(); cla; hold on;
 axis equal
-view([1 1 1])
-xlabel('x')
-ylabel('y')
-zlabel('z')
+view([0,-1,0])
+xlim([-5000,5000])
+ylim([-5000,5000])
+zlim([0,3500])
+xlabel('x (m)')
+ylabel('y (m)')
+zlabel('z (m)')
 colormap(cmap)
 cb = colorbar();
 dele = (max_ele - min_ele)/(n_rays_ele-1);
 clim([min_ele, max_ele])
-% cb.Ticks = la_ele;
+cb.Ticks = -pi:pi/8:pi;
 cb.TickLabels = compose("%0.2fº", rad2deg(cb.Ticks));
 ylabel(cb, 'Ray Launch Elevation')
 
 for ii_ray = 1:size(la,1)
+    msk = r(:,3,ii_ray)>0;
     plot3(ax, ...
-            r(1:max_ii_t(ii_ray), 1, ii_ray),...
-            r(1:max_ii_t(ii_ray), 2, ii_ray),...
-            abs(r(1:max_ii_t(ii_ray), 3, ii_ray)),...
+            r(msk, 1, ii_ray),...
+            r(msk, 2, ii_ray),...
+            abs(r(msk, 3, ii_ray)),...
             'Color', cmap(ele_idx(ii_ray),:)...
             );
         pause(0.01)
 end
-view([0,-1,0])

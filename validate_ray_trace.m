@@ -1,5 +1,7 @@
 %%
 % Validate ray tracer against other model
+clear; 
+close all
 
 %% SIMULATION PARAMETERS
 % time steps

@@ -15,7 +15,7 @@ z_range = [0, 1000];
 
 % source and receiver
 x_src = [0     0   300];
-x_rcv = [50,100,1];
+x_rcv = [-500,1000,1];
 rad_rcv = 15;
 
 % wind
@@ -40,8 +40,28 @@ max_azi = 2*pi - 2*pi/n_rays_azi;
 best_d = 9e9;
 
 figure(2); clf; hold on
+cmap = parula(256);
+ax = gca(); 
+axis equal
+% view([1 1 1])
+view([0 0 1])
+xlabel('x')
+ylabel('y')
+zlabel('z')
+xlim([-2000, 2000]);
+ylim([-2000, 2000]);
+colormap(cmap)
+cb = colorbar();
+clim([-pi/2, pi/2])
+cb.Ticks = -pi/2:pi/8:pi/2;
+cb.TickLabels = compose("%0.2fº", rad2deg(cb.Ticks));
+ylabel(cb, 'Ray Launch Elevation')
 
-while best_d > rad_rcv
+plot3(x_src(1), x_src(2), x_src(3),'ro');
+plot3(x_rcv(1), x_rcv(2), x_rcv(3),'bo');
+
+ii = 1;
+while best_d > rad_rcv 
 
 la_ele = linspace(min_ele, max_ele, n_rays_ele);
 la_azi = linspace(min_azi, max_azi, n_rays_azi);
@@ -72,31 +92,18 @@ end
 
 % plot initial rays
 % Plot Rays
-cmap = parula(n_rays_ele);
-ax = gca(); 
-axis equal
-%view([1 1 1])
-xlabel('x')
-ylabel('y')
-zlabel('z')
-colormap(cmap)
-cb = colorbar();
-clim([-pi/2, pi/2])
-cb.Ticks = -pi/2:pi/8:pi/2;
-cb.TickLabels = compose("%0.2fº", rad2deg(cb.Ticks));
-ylabel(cb, 'Ray Launch Elevation')
 
 for ii_ray = 1:size(la,1)
     plot3(ax, ...
         r(1:max_ii_t(ii_ray), 1, ii_ray),...
         r(1:max_ii_t(ii_ray), 2, ii_ray),...
         abs(r(1:max_ii_t(ii_ray), 3, ii_ray)),...
-        'Color', cmap(ele_idx(ii_ray),:)...
+        'Color', cmap(ceil((la(ii_ray,1)+pi/2)/pi * 255)+1,:)...
         );
     pause(0.01)
+    f(ii) = getframe();
+    ii=ii+1;
 end
-plot3(x_src(1), x_src(2), x_src(3),'ro');
-plot3(x_rcv(1), x_rcv(2), x_rcv(3),'bo');
 
 % find ray that got closest to the point
 track_dists = vecnorm(x_rcv - r, 2,2);
@@ -107,8 +114,11 @@ plot3(ax, ...
 r(1:max_ii_t(best_ray), 1, best_ray),...
 r(1:max_ii_t(best_ray), 2, best_ray),...
 abs(r(1:max_ii_t(best_ray), 3, best_ray)),...
-'Color', 'red'...
+'Color', 'red',...
+'LineWidth',2 ...
 );
+f(ii) = getframe();
+ii=ii+1;
 
 % get neighbors of best ray
 next_ele_idx = mod(ele_idx(best_ray) + [-1,1] -1, length(la_ele))+1;
